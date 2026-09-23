@@ -46,7 +46,11 @@ export class PostgresTravelRequestRepository implements TravelRequestRepository 
   private readonly pool: pg.Pool;
 
   constructor(connectionString: string) {
-    this.pool = new Pool({ connectionString, max: 3 });
+    this.pool = new Pool({
+      connectionString,
+      max: 3,
+      ssl: shouldUseSsl(connectionString) ? { rejectUnauthorized: false } : undefined,
+    });
   }
 
   async initialize(): Promise<void> {
@@ -120,3 +124,12 @@ export function createRepository(): TravelRequestRepository {
     : new MemoryTravelRequestRepository();
 }
 
+function shouldUseSsl(connectionString: string): boolean {
+  try {
+    const url = new URL(connectionString);
+    const sslMode = url.searchParams.get("sslmode");
+    return sslMode === "require" || url.hostname.endsWith(".render.com");
+  } catch {
+    return false;
+  }
+}
