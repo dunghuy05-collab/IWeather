@@ -18,6 +18,10 @@ services:
           property: connectionString
       - key: DISCORD_WEBHOOK_URL
         sync: false
+      - key: DISCORD_PUBLIC_KEY
+        sync: false
+      - key: FUEL_PRICE_PER_LITER_VND
+        value: "24000"
 
 databases:
   - name: wandermind-db

@@ -4,9 +4,13 @@ import { pathToFileURL } from "node:url";
 
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
-import Fastify from "fastify";
+import Fastify, { type FastifyRequest } from "fastify";
 
 import { notifyDiscord } from "./discord.js";
+import {
+  handleDiscordInteraction,
+  verifyDiscordRequest,
+} from "./discordInteractions.js";
 import { createTravelPlan } from "./planner.js";
 import {
   createRepository,
@@ -18,12 +22,27 @@ type AppOptions = {
   repository?: TravelRequestRepository;
   discordNotifier?: typeof notifyDiscord;
   serveFrontend?: boolean;
+  skipDiscordSignatureVerification?: boolean;
+};
+
+type RawBodyRequest = FastifyRequest & {
+  rawBody?: string;
 };
 
 export async function buildApp(options: AppOptions = {}) {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
   const repository = options.repository ?? createRepository();
   const discordNotifier = options.discordNotifier ?? notifyDiscord;
+
+  app.addContentTypeParser("application/json", { parseAs: "string" }, (request, body, done) => {
+    const rawBody = typeof body === "string" ? body : body.toString();
+    (request as RawBodyRequest).rawBody = rawBody;
+    try {
+      done(null, rawBody ? JSON.parse(rawBody) : {});
+    } catch (error) {
+      done(error as Error);
+    }
+  });
 
   await repository.initialize();
   app.addHook("onClose", async () => repository.close());
@@ -36,9 +55,31 @@ export async function buildApp(options: AppOptions = {}) {
   app.get("/api/v1/health", async () => ({ status: "ok", runtime: "node" }));
 
   app.get("/api/v1/integrations/discord/status", async () => ({
-    configured: Boolean(process.env.DISCORD_WEBHOOK_URL),
+    incomingWebhookConfigured: Boolean(process.env.DISCORD_WEBHOOK_URL),
+    slashCommandConfigured: Boolean(process.env.DISCORD_PUBLIC_KEY),
     mode: "incoming-webhook",
   }));
+
+  app.post("/api/v1/discord/interactions", async (request, reply) => {
+    const rawBody = (request as RawBodyRequest).rawBody ?? "";
+    const signature = request.headers["x-signature-ed25519"];
+    const timestamp = request.headers["x-signature-timestamp"];
+    const verified =
+      options.skipDiscordSignatureVerification ||
+      (typeof signature === "string" &&
+        typeof timestamp === "string" &&
+        verifyDiscordRequest(rawBody, signature, timestamp));
+
+    if (!verified) {
+      return reply.code(401).send({ detail: "Invalid Discord request signature" });
+    }
+
+    const response = await handleDiscordInteraction({
+      interaction: request.body as Parameters<typeof handleDiscordInteraction>[0]["interaction"],
+      logger: request.log,
+    });
+    return reply.send(response);
+  });
 
   app.post("/api/v1/integrations/discord/test", async (request, reply) => {
     const probe = {

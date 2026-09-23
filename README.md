@@ -9,6 +9,7 @@ frontend and writes trip requests to PostgreSQL.
 - Next.js App Router frontend exported as static files
 - Node.js, TypeScript, Fastify, Zod, and PostgreSQL backend
 - Discord incoming webhook notification when a travel request is created
+- Discord `/trip` slash command for in-channel trip planning
 - Local rule-based itinerary draft endpoint
 - Render Blueprint configuration in `render.yaml`
 - Docker Compose stack with app plus PostgreSQL
@@ -21,6 +22,7 @@ frontend and writes trip requests to PostgreSQL.
 | `GET` | `/api/v1/health` | Service health check |
 | `GET` | `/api/v1/integrations/discord/status` | Check whether Discord webhook is configured |
 | `POST` | `/api/v1/integrations/discord/test` | Send a Discord test notification |
+| `POST` | `/api/v1/discord/interactions` | Discord slash-command interactions endpoint |
 | `POST` | `/api/v1/travel-requests` | Validate, save, and notify Discord |
 | `GET` | `/api/v1/travel-requests` | List saved requests |
 | `GET` | `/api/v1/travel-requests/:id` | Read one saved request |
@@ -61,14 +63,48 @@ inside the compose network.
 
 ## Discord setup
 
-Create an incoming webhook in the target Discord channel, then set:
+For one-way notifications, create an incoming webhook in the target Discord
+channel, then set:
 
 ```text
 DISCORD_WEBHOOK_URL=<your Discord webhook URL>
 ```
 
-For Render, add it as a secret environment variable. The app never exposes the
-webhook URL through API responses.
+For in-channel trip planning, create a Discord application and configure:
+
+```text
+DISCORD_PUBLIC_KEY=<application public key>
+DISCORD_APPLICATION_ID=<application id>
+DISCORD_BOT_TOKEN=<bot token>
+DISCORD_GUILD_ID=<optional test server id>
+FUEL_PRICE_PER_LITER_VND=24000
+```
+
+Set the Interactions Endpoint URL in the Discord Developer Portal to:
+
+```text
+https://<your-render-url>/api/v1/discord/interactions
+```
+
+Register the slash command from your local machine:
+
+```powershell
+cd backend
+$env:DISCORD_APPLICATION_ID="..."
+$env:DISCORD_BOT_TOKEN="..."
+$env:DISCORD_GUILD_ID="..." # optional, faster for testing
+npm run register:discord
+```
+
+The command is:
+
+```text
+/trip from:"Ho Chi Minh City" to:"Da Lat" days:3 people:2 vehicle:motorbike
+```
+
+It returns homestay search links, weather, driving time, distance, and fuel cost
+estimate in the Discord channel. The app never exposes Discord secrets through
+API responses.
 
 ## Render deployment
 
@@ -78,6 +114,7 @@ The repository includes `render.yaml` for a Blueprint deploy:
 - one free PostgreSQL database named `wandermind-db`
 - health check path: `/api/v1/health`
 - `DISCORD_WEBHOOK_URL` marked `sync: false` so the secret is entered in Render
+- `DISCORD_PUBLIC_KEY` marked `sync: false` for slash-command verification
 
 Render Free Tier is suitable for a demo. Its free web service can spin down after
 idle time and cold start on the next request. Free PostgreSQL has short retention

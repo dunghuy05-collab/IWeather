@@ -19,6 +19,7 @@ before(async () => {
       return true;
     },
     serveFrontend: false,
+    skipDiscordSignatureVerification: true,
   });
 });
 
@@ -65,7 +66,21 @@ test("reports Discord integration status without exposing secrets", async () => 
     url: "/api/v1/integrations/discord/status",
   });
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(response.json(), { configured: false, mode: "incoming-webhook" });
+  assert.deepEqual(response.json(), {
+    incomingWebhookConfigured: false,
+    slashCommandConfigured: false,
+    mode: "incoming-webhook",
+  });
+});
+
+test("handles Discord ping interactions", async () => {
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/v1/discord/interactions",
+    payload: { type: 1 },
+  });
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), { type: 1 });
 });
 
 test("generates a local itinerary draft", async () => {
