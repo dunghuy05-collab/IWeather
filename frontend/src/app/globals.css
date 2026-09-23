@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f3f6ef;
+  --foreground: #17352d;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+@layer components {
+  .field-label {
+    @apply mb-2 block text-sm font-semibold text-[#315348];
+  }
+
+  .field-input {
+    @apply w-full rounded-xl border border-[#17352d]/15 bg-[#f8faf6] px-4 py-3.5 text-sm text-[#17352d] outline-none transition placeholder:text-[#91a199] focus:border-[#c55d32] focus:ring-4 focus:ring-[#c55d32]/10;
+  }
+}

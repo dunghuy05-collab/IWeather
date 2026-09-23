@@ -1,0 +1,30 @@
+# Environment files
+.env
+.env.local
+!.env.example
+!.env.local.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Node.js / Next.js
+node_modules/
+.next/
+out/
+npm-debug.log*
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local data and generated exports
+data/
+exports/
+
