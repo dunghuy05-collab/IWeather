@@ -1,28 +1,20 @@
-# Checkpoint 3 - Basic LLM Travel Planner
+# Checkpoint 3 - Basic Travel Planner
 
-Status: **Implemented**
+Status: Implemented as a local planning draft
 
 ## Delivered
 
-- OpenAI provider configuration through environment variables
-- Dedicated planner service with a reusable system prompt
 - Plan generation from a saved travel request
-- Day-by-day itinerary, budget estimate, and practical-assumption instructions
-- Stateless conversation continuation with validated user/assistant messages
-- Provider failures mapped to explicit `503` or `502` API responses
+- Day-by-day itinerary draft
+- Budget guide based on total budget and duration
+- Practical assumptions and booking cautions
+- `POST /api/v1/travel-requests/:id/plan`
 
-## API
+## Current limitation
 
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| `POST` | `/api/v1/travel-requests/{id}/plan` | Generate an initial itinerary |
-| `POST` | `/api/v1/travel-requests/{id}/chat` | Continue a planning conversation |
+This checkpoint currently uses a local rule-based planner instead of an external
+LLM provider. That keeps the Render Free Tier demo low-cost and reliable while
+the architecture is being moved to Discord and Render.
 
-The chat endpoint receives the conversation history in the request body. Conversation
-memory is intentionally stateless at this checkpoint; persistent memory belongs to a
-later agent architecture checkpoint.
-
-## Configuration
-
-Set `OPENAI_API_KEY` in `backend/.env`. `OPENAI_MODEL` defaults to `gpt-4o-mini`, and
-`LLM_TIMEOUT_SECONDS` defaults to `60`.
+Future work can add an LLM provider behind the same endpoint without changing
+the frontend contract.

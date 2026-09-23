@@ -7,12 +7,17 @@ import { MemoryTravelRequestRepository } from "../src/repository.js";
 import { buildApp } from "../src/server.js";
 
 let app: FastifyInstance;
+const notifications: string[] = [];
 
 before(async () => {
   process.env.NODE_ENV = "test";
+  delete process.env.DISCORD_WEBHOOK_URL;
   app = await buildApp({
     repository: new MemoryTravelRequestRepository(),
-    discordNotifier: async () => false,
+    discordNotifier: async (request) => {
+      notifications.push(request.id);
+      return true;
+    },
     serveFrontend: false,
   });
 });
@@ -51,6 +56,41 @@ test("creates, normalizes, and reads a travel request", async () => {
   });
   assert.equal(fetched.statusCode, 200);
   assert.equal(fetched.json().id, created.id);
+  assert.ok(notifications.includes(created.id));
+});
+
+test("reports Discord integration status without exposing secrets", async () => {
+  const response = await app.inject({
+    method: "GET",
+    url: "/api/v1/integrations/discord/status",
+  });
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), { configured: false, mode: "incoming-webhook" });
+});
+
+test("generates a local itinerary draft", async () => {
+  const createdResponse = await app.inject({
+    method: "POST",
+    url: "/api/v1/travel-requests",
+    payload: {
+      destination: "Bangkok, Thailand",
+      budget: 900,
+      currency: "usd",
+      duration_days: 3,
+      travel_style: "culture",
+      interests: ["Food", "Culture"],
+    },
+  });
+  const created = createdResponse.json();
+
+  const planResponse = await app.inject({
+    method: "POST",
+    url: `/api/v1/travel-requests/${created.id}/plan`,
+  });
+
+  assert.equal(planResponse.statusCode, 200);
+  assert.equal(planResponse.json().request_id, created.id);
+  assert.match(planResponse.json().content, /Trip overview/);
 });
 
 test("rejects invalid input", async () => {
@@ -61,4 +101,3 @@ test("rejects invalid input", async () => {
   });
   assert.equal(response.statusCode, 422);
 });
-

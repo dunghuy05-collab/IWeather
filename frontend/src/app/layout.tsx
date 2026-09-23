@@ -14,13 +14,13 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "WanderMind | AI Personal Travel Planner",
-  description: "Personalized, weather-aware and budget-conscious travel planning.",
+  description: "Travel request intake with Discord notifications and itinerary drafts.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
-      lang="vi"
+      lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>

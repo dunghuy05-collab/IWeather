@@ -1,0 +1,13 @@
+.git
+.next
+node_modules
+npm-debug.log*
+backend/.venv
+backend/data
+backend/dist
+backend/node_modules
+frontend/.next
+frontend/out
+frontend/node_modules
+.env
+.env.local

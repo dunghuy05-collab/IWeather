@@ -1,61 +1,43 @@
 # AI Personal Travel Planner
 
-Web application that will turn a travel request into a personalized, weather-aware,
-budget-conscious itinerary. The system is being delivered incrementally through the
-checkpoints in the project specification.
+WanderMind is a travel-request and itinerary web app prepared for Render Free Tier.
+The app now runs as one Node.js service: a Fastify API serves the Next.js static
+frontend and writes trip requests to PostgreSQL.
 
-## Checkpoint status
+## Current status
 
-Checkpoint 1, Checkpoint 2, and Checkpoint 3 are implemented. The repository contains:
+- Next.js App Router frontend exported as static files
+- Node.js, TypeScript, Fastify, Zod, and PostgreSQL backend
+- Discord incoming webhook notification when a travel request is created
+- Local rule-based itinerary draft endpoint
+- Render Blueprint configuration in `render.yaml`
+- Docker Compose stack with app plus PostgreSQL
+- Backend tests, TypeScript checks, frontend lint, and frontend production build
 
-- Next.js frontend with TypeScript, App Router, Tailwind CSS, and ESLint
-- FastAPI backend with typed settings, CORS, health endpoint, and API documentation
-- Environment-variable templates with no committed secrets
-- Backend tests and linting
-- Dockerfiles and Docker Compose configuration
-- A responsive trip-request form with client-side validation
-- Validated travel-request API endpoints backed by SQLAlchemy
-- Local SQLite persistence, configurable for a production database later
-- Basic LLM travel planning with stateless conversation continuation
-
-### Checkpoint 2 API
+## API
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
-| `POST` | `/api/v1/travel-requests` | Validate and save a trip request |
+| `GET` | `/api/v1/health` | Service health check |
+| `GET` | `/api/v1/integrations/discord/status` | Check whether Discord webhook is configured |
+| `POST` | `/api/v1/integrations/discord/test` | Send a Discord test notification |
+| `POST` | `/api/v1/travel-requests` | Validate, save, and notify Discord |
 | `GET` | `/api/v1/travel-requests` | List saved requests |
-| `GET` | `/api/v1/travel-requests/{id}` | Read one saved request |
-| `POST` | `/api/v1/travel-requests/{id}/plan` | Generate an AI itinerary |
-| `POST` | `/api/v1/travel-requests/{id}/chat` | Continue an AI planning conversation |
+| `GET` | `/api/v1/travel-requests/:id` | Read one saved request |
+| `POST` | `/api/v1/travel-requests/:id/plan` | Generate an itinerary draft |
 
-## Repository layout
+## Local development
 
-```text
-backend/                  FastAPI application and tests
-frontend/                 Next.js application
-docker-compose.yml        Local container orchestration
-AI_Personal_...docx       Original project specification
-```
-
-## Local setup
-
-### Backend
+Backend:
 
 ```powershell
 cd backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements-dev.txt
 Copy-Item .env.example .env
-# Add OPENAI_API_KEY to .env before calling the planning endpoints.
-uvicorn app.main:app --reload
+npm install
+npm run dev
 ```
 
-The API runs at <http://localhost:8000>, interactive documentation is available at
-<http://localhost:8000/docs>, and the health endpoint is
-<http://localhost:8000/api/v1/health>.
-
-### Frontend
+Frontend:
 
 ```powershell
 cd frontend
@@ -64,29 +46,53 @@ npm install
 npm run dev
 ```
 
-The web application runs at <http://localhost:3000>.
-
-## Tests and quality checks
-
-```powershell
-cd backend
-.\.venv\Scripts\python -m pytest
-.\.venv\Scripts\python -m ruff check .
-
-cd ..\frontend
-npm run lint
-npm run build
-```
+The frontend runs at `http://localhost:3000`. The backend example env uses
+`PORT=4000`, and `frontend/.env.local.example` points to
+`http://localhost:4000/api/v1`.
 
 ## Docker
 
-Create local environment files first, then run both services:
-
 ```powershell
-Copy-Item backend\.env.example backend\.env
-Copy-Item frontend\.env.local.example frontend\.env.local
 docker compose up --build
 ```
 
-Real API keys and secrets must only be added to local environment files or a secret
-manager; they must never be committed.
+The Docker stack runs the combined app at `http://localhost:3000` and PostgreSQL
+inside the compose network.
+
+## Discord setup
+
+Create an incoming webhook in the target Discord channel, then set:
+
+```text
+DISCORD_WEBHOOK_URL=<your Discord webhook URL>
+```
+
+For Render, add it as a secret environment variable. The app never exposes the
+webhook URL through API responses.
+
+## Render deployment
+
+The repository includes `render.yaml` for a Blueprint deploy:
+
+- one free web service named `wandermind`
+- one free PostgreSQL database named `wandermind-db`
+- health check path: `/api/v1/health`
+- `DISCORD_WEBHOOK_URL` marked `sync: false` so the secret is entered in Render
+
+Render Free Tier is suitable for a demo. Its free web service can spin down after
+idle time and cold start on the next request. Free PostgreSQL has short retention
+and no production-grade backup guarantees, so upgrade before real users or paid
+travel data.
+
+## Verification
+
+```powershell
+npm run typecheck --prefix backend
+npm test --prefix backend
+npm run build --prefix backend
+npm run lint --prefix frontend
+npm run build --prefix frontend
+docker compose config
+```
+
+Real secrets must stay in local `.env` files or Render environment variables.

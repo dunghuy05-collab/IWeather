@@ -7,6 +7,7 @@ import fastifyStatic from "@fastify/static";
 import Fastify from "fastify";
 
 import { notifyDiscord } from "./discord.js";
+import { createTravelPlan } from "./planner.js";
 import {
   createRepository,
   type TravelRequestRepository,
@@ -25,7 +26,7 @@ export async function buildApp(options: AppOptions = {}) {
   const discordNotifier = options.discordNotifier ?? notifyDiscord;
 
   await repository.initialize();
-  app.addHook("onClose", () => repository.close());
+  app.addHook("onClose", async () => repository.close());
 
   const allowedOrigins = (process.env.CORS_ORIGINS ?? "http://localhost:3000")
     .split(",")
@@ -33,6 +34,33 @@ export async function buildApp(options: AppOptions = {}) {
   await app.register(cors, { origin: allowedOrigins });
 
   app.get("/api/v1/health", async () => ({ status: "ok", runtime: "node" }));
+
+  app.get("/api/v1/integrations/discord/status", async () => ({
+    configured: Boolean(process.env.DISCORD_WEBHOOK_URL),
+    mode: "incoming-webhook",
+  }));
+
+  app.post("/api/v1/integrations/discord/test", async (request, reply) => {
+    const probe = {
+      id: "discord-webhook-test",
+      destination: "Webhook smoke test",
+      budget: 1,
+      currency: "USD",
+      duration_days: 1,
+      travel_style: "comfort" as const,
+      interests: ["integration"],
+      notes: "WanderMind Discord integration is configured.",
+      created_at: new Date().toISOString(),
+    };
+
+    try {
+      const delivered = await discordNotifier(probe);
+      return reply.send({ configured: delivered, delivered });
+    } catch (error) {
+      request.log.warn({ error }, "Discord test notification failed");
+      return reply.code(502).send({ configured: true, delivered: false });
+    }
+  });
 
   app.post("/api/v1/travel-requests", async (request, reply) => {
     const parsed = travelRequestSchema.safeParse(request.body);
@@ -61,6 +89,14 @@ export async function buildApp(options: AppOptions = {}) {
     return record ?? reply.code(404).send({ detail: "Travel request not found" });
   });
 
+  app.post<{ Params: { id: string } }>("/api/v1/travel-requests/:id/plan", async (request, reply) => {
+    const record = await repository.findById(request.params.id);
+    if (!record) {
+      return reply.code(404).send({ detail: "Travel request not found" });
+    }
+    return createTravelPlan(record);
+  });
+
   const frontendRoot = join(process.cwd(), "frontend", "out");
   if (options.serveFrontend !== false && existsSync(frontendRoot)) {
     await app.register(fastifyStatic, { root: frontendRoot });
@@ -81,4 +117,3 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     process.exit(1);
   });
 }
-
